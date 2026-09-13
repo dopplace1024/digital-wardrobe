@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мой Цифровой Гардероб (Прототип)</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 20px auto; padding: 10px; background-color: #f9f9f9; color: #333; }
+        .block { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        input, select, button { width: 100%; padding: 10px; margin: 5px 0 15px 0; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { background-color: #4CAF50; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:hover { background-color: #45a049; }
+        #result { white-space: pre-wrap; font-size: 14px; line-height: 1.5; color: #222; }
+        .rating-badge { display: inline-block; background: #2196F3; color: white; padding: 5px 10px; border-radius: 20px; font-weight: bold; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>👗 Мой Цифровой Гардероб AI</h2>
+    
+    <!-- 1. Настройка ключа -->
+    <div class="block">
+        <label>Вставьте ваш Gemini API Key:</label>
+        <input type="password" id="apiKey" placeholder="AIzaSy...">
+    </div>
+
+    <!-- 2. Имитация базы данных -->
+    <div class="block">
+        <h3>👜 Мой шкаф (Имитация базы данных)</h3>
+        <p>Сейчас в коде «зашиты» ваши вещи: Синие джинсы Levis, Белые кроссовки Reebok, Черное худи Nike, Сумка-багет Mango.</p>
+        <label>Какую задачу решаем?</label>
+        <select id="mode">
+            <option value="pick_bag">Выбрать сумку под образ</option>
+            <option value="pick_shoes">Выбрать обувь под образ</option>
+            <option value="rate_all">Оценить образ целиком (от 1 до 10)</option>
+        </select>
+    </div>
+
+    <!-- 3. Загрузка живого фото -->
+    <div class="block">
+        <h3>📸 Ваше живое селфи</h3>
+        <input type="file" id="imageInput" accept="image/*">
+        <button id="sendBtn">Спросить ИИ-стилиста</button>
+    </div>
+
+    <!-- 4. Результат -->
+    <div class="block" id="resultBlock" style="display:none;">
+        <h3>✨ Вердикт ИИ:</h3>
+        <div id="result">Ожидание ответа...</div>
+    </div>
+
+    <script>
+        // Имитируем текстовый контекст шкафа, который потом будет забираться из Supabase
+        const mockClosetContext = `
+        Ты — персональный ИИ-стилист в приложении "Цифровой гардероб". 
+        Вот список вещей, которые УЖЕ ЕСТЬ в шкафу пользователя:
+        - ID: item_001 | Категория: Обувь | Кроссовки Reebok Classic, цвет: белый, кожа.
+        - ID: item_002 | Категория: Брюки | Джинсы Levi's 501, цвет: синий деним, прямые.
+        - ID: item_003 | Категория: Верх | Худи Nike оверсайз, цвет: черный, плотный трикотаж.
+        - ID: item_004 | Категория: Сумки | Маленькая сумка-багет Mango, цвет: черный, лаковая кожа.
+        - ID: item_005 | Категория: Сумки | Большой шоппер Zara, цвет: бежевый, текстиль.
+        `;
+
+        document.getElementById('sendBtn').addEventListener('click', async () => {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const mode = document.getElementById('mode').value;
+            const fileInput = document.getElementById('imageInput');
+            const resultDiv = document.getElementById('result');
+            const resultBlock = document.getElementById('resultBlock');
+
+            if (!apiKey) return alert('Пожалуйста, вставьте ваш API ключ!');
+            if (fileInput.files.length === 0) return alert('Пожалуйста, выберите фотографию (селфи)!');
+
+            resultBlock.style.display = 'block';
+            resultDiv.innerText = 'ИИ анализирует образ... Пожалуйста, подождите (обычно 3-5 секунд).';
+
+            const file = fileInput.files[0];
+            
+            // Переводим файл картинки в формат base64, который понимает API Google
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onloadend = async () => {
+                const base64Data = reader.result.split(',')[1];
+                const mimeType = file.type;
+
+                // Настраиваем промпт в зависимости от выбранной вами кнопки
+                let modePrompt = "";
+                if (mode === "pick_bag") {
+                    modePrompt = "Внимательно изучи образ человека на фото. Из списка его сумок (item_004 и item_005) выбери ту, которая лучше всего завершит этот лук. Напиши почему и поставь образу оценку.";
+                } else if (mode === "pick_shoes") {
+                    modePrompt = "Посмотри на одежду на фото. Подойдут ли сюда белые кроссовки Reebok (item_001)? Или посоветуй, какую обувь (стиль, цвет) стоит добавить, если кроссовки не подходят.";
+                } else {
+                    modePrompt = "Оцени образ человека на фото по шкале от 1 до 10. Распиши плюсы, минусы и дай поддерживающий совет стилиста.";
+                }
+
+                const fullPrompt = `${mockClosetContext}\nЗадание: ${modePrompt}\nОтвечай как поддерживающая подруга-стилист, честно, но мягко.`;
+
+                // Формируем официальный запрос к Google Gemini API
+                const url = `https://googleapis.com{apiKey}`;
+                
+                const payload = {
+                    contents: [{
+                        parts: [
+                            { text: fullPrompt },
+                            { inlineData: { mimeType: mimeType, data: base64Data } }
+                        ]
+                    }]
+                };
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    const data = await response.json();
+                    
+                    if (data.candidates && data.candidates[0].content.parts[0].text) {
+                        resultDiv.innerText = data.candidates[0].content.parts[0].text;
+                    } else {
+                        resultDiv.innerText = 'Произошла ошибка при разборе ответа от ИИ. Проверьте ключ.';
+                    }
+                } catch (error) {
+                    console.error(error);
+                    resultDiv.innerText = 'Ошибка соединения с API Google: ' + error.message;
+                }
+            };
+        });
+    </script>
+</body>
+</html>
