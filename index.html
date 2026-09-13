@@ -37,11 +37,13 @@
         <div id="response">Здесь появится ответ от Gemini...</div>
     </div>
 
-    <!-- ГАРАНТИРОВАННОЕ ПОДКЛЮЧЕНИЕ SDK ЧЕРЕЗ СТАНДАРТНЫЙ СКРИПТ -->
-    <script src="https://jsdelivr.net"></script>
+    <!-- Подключаем SDK через стабильный ESM-сервис Unpkg с указанием точного JS-файла -->
+    <script type="module">
+        import { GoogleGenAI } from 'https://unpkg.com';
 
-    <script>
-        async function askGemini() {
+        // Явно привязываем функцию к глобальному объекту window, 
+        // чтобы HTML-кнопка гарантированно смогла её вызвать.
+        window.askGemini = async function() {
             const apiKeyInput = document.getElementById('apiKey').value.trim();
             const promptInput = document.getElementById('prompt').value.trim();
             const responseDiv = document.getElementById('response');
@@ -61,12 +63,8 @@
             sendBtn.disabled = true;
 
             try {
-                // Инициализация через глобальную переменную библиотеки window.GoogleGenAI
-                if (typeof GoogleGenAI === 'undefined') {
-                    throw new Error('Библиотека Google AI не загрузилась. Попробуйте отключить AdBlock / VPN или обновить страницу.');
-                }
-
-                const ai = new GoogleGenAI.GoogleGenAI({ apiKey: apiKeyInput });
+                // Инициализируем Google AI с ключом пользователя
+                const ai = new GoogleGenAI({ apiKey: apiKeyInput });
                 const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
                 
                 const result = await model.generateContent(promptInput);
