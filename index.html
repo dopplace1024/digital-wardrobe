@@ -37,13 +37,9 @@
         <div id="response">Здесь появится ответ от Gemini...</div>
     </div>
 
-    <!-- Подключаем SDK через стабильный ESM-сервис Unpkg с указанием точного JS-файла -->
-    <script type="module">
-        import { GoogleGenAI } from 'https://unpkg.com';
-
-        // Явно привязываем функцию к глобальному объекту window, 
-        // чтобы HTML-кнопка гарантированно смогла её вызвать.
-        window.askGemini = async function() {
+    <!-- ОБЫЧНЫЙ СТАНДАРТНЫЙ СКРИПТ (БЕЗ DEPENDENCIES / БЕЗ ИМПОРТОВ) -->
+    <script>
+        async function askGemini() {
             const apiKeyInput = document.getElementById('apiKey').value.trim();
             const promptInput = document.getElementById('prompt').value.trim();
             const responseDiv = document.getElementById('response');
@@ -62,14 +58,37 @@
             responseDiv.innerText = 'Секунду, Gemini думает... 🤖';
             sendBtn.disabled = true;
 
+            // Формируем прямую ссылку на официальный API Google Gemini
+            const url = `https://googleapis.com{apiKeyInput}`;
+
             try {
-                // Инициализируем Google AI с ключом пользователя
-                const ai = new GoogleGenAI({ apiKey: apiKeyInput });
-                const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
-                
-                const result = await model.generateContent(promptInput);
-                
-                responseDiv.innerText = result.response.text();
+                // Отправляем стандартный POST запрос
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: promptInput }]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+
+                // Проверяем, вернул ли сервер Google ошибку (например, неверный ключ)
+                if (data.error) {
+                    throw new Error(data.error.message || 'Ошибка API Google');
+                }
+
+                // Достаем текст ответа из стандартной структуры JSON ответа Gemini
+                if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
+                    responseDiv.innerText = data.candidates[0].content.parts[0].text;
+                } else {
+                    throw new Error('Получен пустой или неожиданный ответ от сервера.');
+                }
+
             } catch (error) {
                 console.error(error);
                 responseDiv.className = 'error';
