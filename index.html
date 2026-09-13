@@ -18,7 +18,7 @@
 </head>
 <body>
 
-    <!-- Блок ввода API-ключа (как на вашем скриншоте) -->
+    <!-- Блок ввода API-ключа -->
     <div class="box">
         <label for="apiKey">Вставьте ваш Gemini API Key:</label>
         <input type="password" id="apiKey" placeholder="AIzaSy..." autocomplete="off">
@@ -27,7 +27,7 @@
     <!-- Блок отправки запроса -->
     <div class="box">
         <label for="prompt">Ваш запрос к ИИ:</label>
-        <textarea id="prompt" placeholder="Напиши стихотворение о программировании..."></textarea>
+        <textarea id="prompt" placeholder="Напиши приветствие..."></textarea>
         <button id="sendBtn" onclick="askGemini()">Отправить запрос</button>
     </div>
 
@@ -37,18 +37,16 @@
         <div id="response">Здесь появится ответ от Gemini...</div>
     </div>
 
-    <!-- Подключение официального SDK Google AI через ESM -->
-    <script type="module">
-        import { GoogleGenAI } from 'https://esm.run';
+    <!-- ГАРАНТИРОВАННОЕ ПОДКЛЮЧЕНИЕ SDK ЧЕРЕЗ СТАНДАРТНЫЙ СКРИПТ -->
+    <script src="https://jsdelivr.net"></script>
 
-        // Делаем функцию доступной для кнопки в HTML
-        window.askGemini = async function() {
+    <script>
+        async function askGemini() {
             const apiKeyInput = document.getElementById('apiKey').value.trim();
             const promptInput = document.getElementById('prompt').value.trim();
             const responseDiv = document.getElementById('response');
             const sendBtn = document.getElementById('sendBtn');
 
-            // Проверки на заполненность полей
             if (!apiKeyInput) {
                 alert('Пожалуйста, введите ваш Gemini API Key!');
                 return;
@@ -58,33 +56,30 @@
                 return;
             }
 
-            // Визуальный индикатор загрузки
             responseDiv.className = ''; 
             responseDiv.innerText = 'Секунду, Gemini думает... 🤖';
             sendBtn.disabled = true;
 
             try {
-                // Инициализируем Google AI с ключом, который ввел пользователь
-                const ai = new GoogleGenAI({ apiKey: apiKeyInput });
-                
-                // Используем самую быструю и универсальную модель на текущий момент
+                // Инициализация через глобальную переменную библиотеки window.GoogleGenAI
+                if (typeof GoogleGenAI === 'undefined') {
+                    throw new Error('Библиотека Google AI не загрузилась. Попробуйте отключить AdBlock / VPN или обновить страницу.');
+                }
+
+                const ai = new GoogleGenAI.GoogleGenAI({ apiKey: apiKeyInput });
                 const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
                 
-                // Отправляем запрос
                 const result = await model.generateContent(promptInput);
                 
-                // Выводим результат на экран
                 responseDiv.innerText = result.response.text();
             } catch (error) {
                 console.error(error);
                 responseDiv.className = 'error';
                 responseDiv.innerText = 'Произошла ошибка при запросе:\n' + error.message;
             } finally {
-                // Возвращаем кнопку в активное состояние
                 sendBtn.disabled = false;
             }
         }
     </script>
-
 </body>
 </html>
