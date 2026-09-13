@@ -18,39 +18,31 @@
 </head>
 <body>
 
-    <!-- Блок ввода API-ключа -->
     <div class="box">
         <label for="apiKey">Вставьте ваш Gemini API Key:</label>
         <input type="password" id="apiKey" placeholder="AIzaSy..." autocomplete="off">
     </div>
 
-    <!-- Блок отправки запроса -->
     <div class="box">
         <label for="prompt">Ваш запрос к ИИ:</label>
         <textarea id="prompt" placeholder="Напиши приветствие..."></textarea>
         <button id="sendBtn" onclick="askGemini()">Отправить запрос</button>
     </div>
 
-    <!-- Блок вывода ответа -->
     <div class="box">
         <h3>Ответ ИИ:</h3>
         <div id="response">Здесь появится ответ от Gemini...</div>
     </div>
 
-    <!-- Логика работы без внешних библиотек -->
     <script>
-        function askGemini() {
+        async function askGemini() {
             const apiKeyInput = document.getElementById('apiKey').value.trim();
             const promptInput = document.getElementById('prompt').value.trim();
             const responseDiv = document.getElementById('response');
             const sendBtn = document.getElementById('sendBtn');
 
-            if (!apiKeyInput) {
-                alert('Пожалуйста, введите ваш Gemini API Key!');
-                return;
-            }
-            if (!promptInput) {
-                alert('Введите текст запроса!');
+            if (!apiKeyInput || !promptInput) {
+                alert('Заполните поле ключа и поле запроса!');
                 return;
             }
 
@@ -58,47 +50,41 @@
             responseDiv.innerText = 'Секунду, Gemini думает... 🤖';
             sendBtn.disabled = true;
 
-            const url = `https://googleapis.com{apiKeyInput}`;
+            // Используем v1beta эндпоинт, разрешающий прямые запросы
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKeyInput}`;
 
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', url, true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: promptInput }] }]
+                    })
+                });
 
-            xhr.onload = function () {
-                sendBtn.disabled = false;
-                try {
-                    const data = JSON.parse(xhr.responseText);
+                const data = await response.json();
 
-                    if (data.error) {
-                        throw new Error(data.error.message || 'Ошибка API Google');
-                    }
-
-                    // В JSON-ответе Gemini кандидаты и части текста лежат в массивах под индексом [0]
-                    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
-                        responseDiv.innerText = data.candidates[0].content.parts[0].text;
-                    } else {
-                        throw new Error('Получен неожиданный формат ответа. Проверьте правильность ключа.');
-                    }
-                } catch (error) {
-                    console.error(error);
-                    responseDiv.className = 'error';
-                    responseDiv.innerText = 'Ошибка обработки:\n' + error.message;
+                // Если Google вернул структурированную ошибку (например, плохой ключ или блок региона)
+                if (data.error) {
+                    throw new Error(`[Google API Error] ${data.error.status}: ${data.error.message}`);
                 }
-            };
 
-            xhr.onerror = function () {
-                sendBtn.disabled = false;
+                // Корректный разбор массивов ответа Gemini
+                if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+                    responseDiv.innerText = data.candidates[0].content.parts[0].text;
+                } else {
+                    // Если структура неожиданная, выведем сырой JSON для отладки
+                    responseDiv.innerText = "Успешно, но странный формат:\n" + JSON.stringify(data, null, 2);
+                }
+
+            } catch (error) {
+                console.error(error);
                 responseDiv.className = 'error';
-                responseDiv.innerText = 'Сетевая ошибка! Браузер заблокировал запрос.\n\nВозможные причины:\n1. VPN работает не для всех вкладок Firefox.\n2. Включена жесткая защита CORS в настройках браузера. Попробуйте открыть сайт в Chrome.';
-            };
-
-            const body = JSON.stringify({
-                contents: [{
-                    parts: [{ text: promptInput }]
-                }]
-            });
-            
-            xhr.send(body);
+                responseDiv.innerText = 'Произошла ошибка:\n' + error.message + 
+                    '\n\nЕсли написано "Failed to fetch", значит ваш VPN пропускает запросы к *.googleapis.com мимо туннеля. Попробуйте сменить локацию или сам VPN-сервис.';
+            } finally {
+                sendBtn.disabled = false;
+            }
         }
     </script>
 </body>
