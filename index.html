@@ -37,9 +37,9 @@
         <div id="response">Здесь появится ответ от Gemini...</div>
     </div>
 
-    <!-- ОБЫЧНЫЙ СТАНДАРТНЫЙ СКРИПТ (БЕЗ DEPENDENCIES / БЕЗ ИМПОРТОВ) -->
+    <!-- Логика работы без внешних библиотек -->
     <script>
-        async function askGemini() {
+        function askGemini() {
             const apiKeyInput = document.getElementById('apiKey').value.trim();
             const promptInput = document.getElementById('prompt').value.trim();
             const responseDiv = document.getElementById('response');
@@ -58,44 +58,47 @@
             responseDiv.innerText = 'Секунду, Gemini думает... 🤖';
             sendBtn.disabled = true;
 
-            // Формируем прямую ссылку на официальный API Google Gemini
             const url = `https://googleapis.com{apiKeyInput}`;
 
-            try {
-                // Отправляем стандартный POST запрос
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{ text: promptInput }]
-                        }]
-                    })
-                });
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
 
-                const data = await response.json();
-
-                // Проверяем, вернул ли сервер Google ошибку (например, неверный ключ)
-                if (data.error) {
-                    throw new Error(data.error.message || 'Ошибка API Google');
-                }
-
-                // Достаем текст ответа из стандартной структуры JSON ответа Gemini
-                if (data.candidates && data.candidates[0].content && data.candidates[0].content.parts) {
-                    responseDiv.innerText = data.candidates[0].content.parts[0].text;
-                } else {
-                    throw new Error('Получен пустой или неожиданный ответ от сервера.');
-                }
-
-            } catch (error) {
-                console.error(error);
-                responseDiv.className = 'error';
-                responseDiv.innerText = 'Произошла ошибка при запросе:\n' + error.message;
-            } finally {
+            xhr.onload = function () {
                 sendBtn.disabled = false;
-            }
+                try {
+                    const data = JSON.parse(xhr.responseText);
+
+                    if (data.error) {
+                        throw new Error(data.error.message || 'Ошибка API Google');
+                    }
+
+                    // В JSON-ответе Gemini кандидаты и части текста лежат в массивах под индексом [0]
+                    if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+                        responseDiv.innerText = data.candidates[0].content.parts[0].text;
+                    } else {
+                        throw new Error('Получен неожиданный формат ответа. Проверьте правильность ключа.');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    responseDiv.className = 'error';
+                    responseDiv.innerText = 'Ошибка обработки:\n' + error.message;
+                }
+            };
+
+            xhr.onerror = function () {
+                sendBtn.disabled = false;
+                responseDiv.className = 'error';
+                responseDiv.innerText = 'Сетевая ошибка! Браузер заблокировал запрос.\n\nВозможные причины:\n1. VPN работает не для всех вкладок Firefox.\n2. Включена жесткая защита CORS в настройках браузера. Попробуйте открыть сайт в Chrome.';
+            };
+
+            const body = JSON.stringify({
+                contents: [{
+                    parts: [{ text: promptInput }]
+                }]
+            });
+            
+            xhr.send(body);
         }
     </script>
 </body>
